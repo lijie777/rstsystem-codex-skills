@@ -28,32 +28,32 @@ description: Use when reviewing surgical navigation or robot fail-safe behavior,
 ## Checklist
 
 ### 1. 跟踪丢失 / 设备失联的 fail-safe
-- [ ] **跟踪 `missing` 标记必须阻断计算，禁止用缺失数据继续**。正例 `PluginBaseOTS::getNavigatorToolData*`：`m_recvData[i].m_isMissing` 为真则 `return false`（注释自述"之前未加会影响真实输出"——曾是反模式）。反模式信号：拿到 toolInfo 不查 `m_isMissing` 就直接用 `m_tx/m_ty/m_qx...`。
+- [ ] **跟踪 `missing` 标记必须阻断计算，禁止用缺失数据继续**。正例：OTS/跟踪服务的 `getNavigatorToolData*` 在 `m_recvData[i].m_isMissing` 为真时 `return false`。反模式信号：拿到 toolInfo 不查 `m_isMissing` 就直接用 `m_tx/m_ty/m_qx...`。
 - [ ] **实时位姿无效时隐藏/跳过该工具，绝不回退到上一帧或测试动画**。正例 `SurgicalNavigatWidget.Tracking.cpp`：`!ndiValid` → `setRenderedVisible(false); continue;`，且矩阵先过 `isValidNavMatrix`（齐次行 + 旋转行列式下限）。反模式信号：`if(!valid){ mat = lastMat; }` 或继续渲染旧位姿。
-- [ ] **缓存帧要有新鲜度/超时(staleness)检测**。⚠️ 本项目薄弱点：`PluginBaseOTS::getNavigatorToolData` 只读 `m_recvData`(上一帧缓存)，若 NDI **完全停推帧**(线缆假死)，`m_isMissing` 不会自动翻转，可能持续返回最后一帧。审查：跟踪/设备数据是否带时间戳，超过 N ms 无新帧是否熔断。
-- [ ] **设备失联超时阈值是否合理、超时后是否有强制动作**。⚠️ 反模式 `PluginControlBoard::OnHeartbeatMonitoring`：术中机械臂控制板**失联 15 秒**才反应，且仅断 socket + 发通知、**无强制急停/停机**。审查：心跳超时阈值是否过长、超时后是否只断连不停机。
+- [ ] **缓存帧要有新鲜度/超时(staleness)检测**。⚠️ 常见薄弱点：OTS/跟踪服务的 `getNavigatorToolData` 只读上一帧缓存，若 NDI/跟踪器 **完全停推帧**(线缆假死)，`m_isMissing` 不会自动翻转，可能持续返回最后一帧。审查：跟踪/设备数据是否带时间戳，超过 N ms 无新帧是否熔断。
+- [ ] **设备失联超时阈值是否合理、超时后是否有强制动作**。⚠️ 反模式：术中机械臂控制板心跳监控**失联 15 秒**才反应，且仅断 socket + 发通知、**无强制急停/停机**。审查：心跳超时阈值是否过长、超时后是否只断连不停机。
 - [ ] **失效事件的日志级别**：本项目系统性偏低——OTS missing、心跳超时都记 `LOG_INFO`。安全相关失效应 `LOG_ERROR` 并触发可见告警，而非淹没在 INFO 里。
 
 ### 2. 运动 / 边界限位（机械臂，纵深防御明显偏薄）
-- [ ] **机械臂运动指令在上位机是否有范围/限位/奇异性校验**。⚠️ 反模式 `PluginRoboticArm::ArmMoveToAppointPostureCmd`：x/y/z/rx/ry/rz/speed/accel 直接 set 进 proto 下发，**零校验**，只有一行 qDebug。审查：`set_x/set_y/...` 下发前是否有 `clamp`/工作空间/速度上限检查。
-- [ ] **被注释掉的安全功能**。⚠️ 反模式 `PluginRoboticArm::ArmMovingBoundaryControlCmd` 整段被注释。grep 注释块里的 `Boundary/Safe/Limit/限位/边界`，确认不是把安全功能临时关掉忘了开。
+- [ ] **机械臂运动指令在上位机是否有范围/限位/奇异性校验**。⚠️ 反模式：机械臂 `ArmMoveToAppointPostureCmd` 这类运动接口把 x/y/z/rx/ry/rz/speed/accel 直接 set 进 proto 下发，**零校验**，只有一行 qDebug。审查：`set_x/set_y/...` 下发前是否有 `clamp`/工作空间/速度上限检查。
+- [ ] **被注释掉的安全功能**。⚠️ 反模式：机械臂边界控制/限位控制函数整段被注释。grep 注释块里的 `Boundary/Safe/Limit/限位/边界`，确认不是把安全功能临时关掉忘了开。
 - [ ] **限位完全外包给下位机 = 单点防御**。即便下位机有限位，上位机也应有一层校验，避免越界/奇异姿态指令原样下发。
 
 ### 3. 空数据 / 无效输入拦截
-- [ ] **取数前判空 + size 检查**。正例 `PluginBaseOTS`：`m_recvData.size()==0` → `return false`；标定点数不符不写入并 `qWarning`(`casepreviewview.cpp`)。反模式信号：`at(0)`/`[0]`/`front()` 前无 size 检查、未配准就拿配准矩阵算。
+- [ ] **取数前判空 + size 检查**。正例：OTS/跟踪数据 `m_recvData.size()==0` → `return false`；标定点数不符不写入并 `qWarning`。反模式信号：`at(0)`/`[0]`/`front()` 前无 size 检查、未配准就拿配准矩阵算。
 - [ ] **关键前置数据为空要拦在阶段入口**，而不是放进去后崩在深处（呼应第 0 节门禁）。
 - [ ] 区分"固定尺寸 Eigen/数组分量访问(`p[0]`)"与"动态容器越界"——前者无风险，别误报；重点查动态 `std::vector`/`QList` 的越界。
 
 ### 4. 错误不可静默吞掉
 - [ ] **`catch` 不能只 `cerr`/`qDebug` 就算完**。⚠️ 反模式 `Crypto.cpp`：解密 `catch` 里只 `std::cerr`，函数 `void` 无返回值、调用方无感知，可能用未解密/缺失文件继续。审查：底层工具库的失败是否被吞、调用方能否知道失败。
-- [ ] **失败后必须改变控制流**，不能记一行日志继续往下。正例 `PluginCollectPointsView`：DICOM 导入 `catch(...)` → 弹窗 + `return`；`SurgicalPlanWidget` 相机初始化三段 catch + 降级到默认相机。
+- [ ] **失败后必须改变控制流**，不能记一行日志继续往下。正例：采点/影像导入模块 DICOM 导入 `catch(...)` → 弹窗 + `return`；手术规划界面相机初始化失败后降级到默认相机。
 - [ ] 返回 `bool`/错误码的函数，调用方是否检查了返回值（呼应数据库层 `exec()` 被忽略的同类问题，见 [[database-integrity-review]]）。
 
 ### 5. 危险物理操作的二次确认
 - [ ] **物理危险动作要有二次确认**。⚠️ 本项目不对称：数据删除有确认（`SpineCaseManager` 删除案例 `KMessageBox::question("此操作不可恢复")`、`SegmentMain` 清除分割结果确认），但**机械臂"运动到指定位姿"/自由拖动使能/OTS 开关均无二次确认**，直接下发命令。审查：使能/运动/上电这类会让机器物理动作的入口是否有确认或安全联锁。
 
 ### 6. 默认安全态
-- [ ] **状态/使能标志默认应为"安全(false/未连接/禁用)"**。正例：`PluginControlBoard` 的 `m_isSocketConnected=false`、`m_isControlBoardReady=false`；`commonData.cpp` 的 `*_Connect=false`；保存按钮默认 `setEnabled(false)`。反模式信号：连接/就绪/使能/允许 默认 `true`，要靠后续代码去关——一旦那段没执行就处于危险态。
+- [ ] **状态/使能标志默认应为"安全(false/未连接/禁用)"**。正例：控制板模块的 `m_isSocketConnected=false`、`m_isControlBoardReady=false`；全局设备连接状态 `*_Connect=false`；保存按钮默认 `setEnabled(false)`。反模式信号：连接/就绪/使能/允许 默认 `true`，要靠后续代码去关——一旦那段没执行就处于危险态。
 
 ## 本项目易错点速查（识别这些"形状"）
 
@@ -61,18 +61,18 @@ description: Use when reviewing surgical navigation or robot fail-safe behavior,
 |---|---|---|
 | 门禁判定 `RequestServer` 后不判空就放行 / 异常分支 `return true` | 各阶段入口 vs 正例 `MainView::currentSurgicalConfigHasSelectedLevels` | fail-open，无前置条件也能进下一阶段 |
 | 改了 pose/transform/植入物，案例仍标"已规划/已保存" | 规划→导航衔接 vs 正例 `downgradeCurrentCasePlanStatusIfPlaned` | 旧规划被当成已保存进导航 |
-| 取 toolInfo 不查 `m_isMissing` 就用坐标 | `PluginBaseOTS`/`PluginOTS` | 用缺失/无效跟踪数据继续算位姿 |
+| 取 toolInfo 不查 `m_isMissing` 就用坐标 | OTS/跟踪采集服务 | 用缺失/无效跟踪数据继续算位姿 |
 | `if(!valid) mat=lastMat;` 或继续渲染旧位姿 | 导航实时刷新 vs 正例 `Tracking.cpp` 隐藏工具 | 跟踪丢了却显示旧位置，误导术者 |
-| 跟踪缓存帧无时间戳/超时熔断 | `PluginBaseOTS::getNavigatorToolData` | 设备停推帧(假死)时持续返回最后一帧 |
-| 心跳超时阈值过长 + 超时仅断连不停机 | `PluginControlBoard::OnHeartbeatMonitoring`(15s) | 术中失联很久才反应，无急停 |
-| 机械臂位姿下发零范围/限位/奇异校验 | `PluginRoboticArm::ArmMoveToAppointPostureCmd` | 越界/奇异指令原样下发给机器 |
-| 安全功能整段被注释 | `PluginRoboticArm::ArmMovingBoundaryControlCmd` | 边界控制被关掉 |
+| 跟踪缓存帧无时间戳/超时熔断 | OTS/跟踪服务 `getNavigatorToolData` | 设备停推帧(假死)时持续返回最后一帧 |
+| 心跳超时阈值过长 + 超时仅断连不停机 | 控制板心跳监控(如 15s 才处理) | 术中失联很久才反应，无急停 |
+| 机械臂位姿下发零范围/限位/奇异校验 | 机械臂运动指令下发函数 | 越界/奇异指令原样下发给机器 |
+| 安全功能整段被注释 | 机械臂边界/限位控制函数 | 边界控制被关掉 |
 | `catch` 只 `cerr`/`qDebug`，函数 void 无返回 | `Crypto.cpp` | 失败静默，调用方拿缺失数据继续 |
 | 安全失效记 `LOG_INFO` 而非 `LOG_ERROR`/告警 | OTS missing、心跳超时 | 关键失效淹没在 INFO 里无人看见 |
-| 物理动作(使能/运动/上电)无二次确认 | `PluginRoboticArm` 使能/运动、OTS 开关 | 误触即物理动作 |
+| 物理动作(使能/运动/上电)无二次确认 | 机械臂使能/运动、OTS/跟踪器开关 | 误触即物理动作 |
 | 使能/允许/连接标志默认 `true` | 全局搜默认值 | 初始即危险态 |
 
-> 安全范例（"应该怎么写"的对照）：`MainView` 的统一门禁(fail-closed) + `CoreUi::canEnterModuleOrWarn` 拦截切页、`downgradeCurrentCasePlanStatusIfPlaned` 危险操作回退状态、`PluginBaseOTS` 的 `m_isMissing` 阻断、`Tracking.cpp` 无效帧隐藏工具、删除案例的 `KMessageBox::question` 二次确认。
+> 安全范例（"应该怎么写"的对照）：主界面的统一门禁(fail-closed) + `canEnterModuleOrWarn` 这类入口拦截、危险操作回退规划状态、OTS/跟踪服务的 `m_isMissing` 阻断、跟踪界面隐藏无效工具、删除病例的 `KMessageBox::question` 二次确认。
 
 ## 输出格式（审查报告）
 

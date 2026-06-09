@@ -1,21 +1,21 @@
 ---
 name: rst-review
 description: >
-  RSTSystem（脊柱/创伤外科导航机器人）改动聚合审查调度器：自动判断本次代码改动涉及
+  骨科机器人项目改动聚合审查调度器：自动判断本次代码改动涉及
   哪些领域(渲染/Qt/并发/几何变换/手术安全/数据库/跨平台)，调用对应的专项审查 skill，
   在运行时支持子代理时并行审查，把多边发现合并、去重、分级成一份报告，再逐条交用户
   确认、由当前会话实施修复。一条命令覆盖一个改动涉及的全部专项视角，省去手动逐个调用。
   本 skill 为工具中立设计，Claude Code 与 Codex（及其它兼容 Agent Skills 的工具）均可直接使用。
   Use this when the user runs /rst-review (or $rst-review), or asks to 全审 / 聚合审 /
   综合审 / 按相关专项审一遍 / 把相关的 review skill 都跑一下 / comprehensive review of my
-  changes, i.e. wants all relevant RSTSystem domain-specific review skills applied to the
+  changes, i.e. wants all relevant orthopedic robotics domain-specific review skills applied to the
   current diff (or a whole module) at once, followed by user-confirmed fixes; optionally
   exports the report to a docs/ folder on request.
   触发词：rst-review、聚合审、综合审、全审、全部专项、相关专项都审、一键审查、
   把 review 都跑一遍、综合复核、改动涉及多个领域帮我审、导出报告、导出审查报告、存档报告、--export。
 ---
 
-# RSTSystem 聚合审查调度器 (rst-review)
+# 骨科机器人项目聚合审查调度器 (rst-review)
 
 一个改动常常**同时**踩到多个领域（改个"植入物位姿调整后的 3D 刷新"就同时涉及渲染、Qt 信号槽、几何变换三块）。本 skill 自动识别本次改动涉及哪些领域，把对应的专项审查跑一遍（运行时支持子代理时**并行**，否则主会话**顺序**），再汇总成一份分级报告——你不用记 skill 名、不用逐个手动调用。
 
@@ -23,7 +23,7 @@ description: >
 
 ## 使用边界
 
-显式触发本 skill 的信号：`rst-review` / `$rst-review` / `/rst-review`、聚合审、综合审、全审、一键审查、把相关 review skill 都跑一下、按 RSTSystem 相关专项审一遍、comprehensive review of my changes。
+显式触发本 skill 的信号：`rst-review` / `$rst-review` / `/rst-review`、聚合审、综合审、全审、一键审查、把相关 review skill 都跑一下、按骨科机器人项目相关专项审一遍、comprehensive review of my changes。
 
 被显式触发时按本文流程走，不要再叠加其它通用 review 流程。**不要在普通编码任务中自动触发**。用户触发本 skill 本身即表示允许使用子代理做只读审查。
 
@@ -36,7 +36,7 @@ description: >
 1. 用户给了 **git ref / 区间**（如某 commit、`A..B`、`main...HEAD`）→ 审对应 diff：
    - 单个提交：`git show <commit>` 或 `git diff <commit>^..<commit>`
    - 区间/分支差异：`git diff <A>..<B>` / `<A>...<B>` / `<commit>..HEAD`
-2. 用户给了 **路径过滤条件**（如"审查 `src/Plugins/PluginSurgicalNavigatView` 的未提交改动"）→ 在对应 diff 后追加 `-- <path>`：
+2. 用户给了 **路径过滤条件**（如"审查 `src/Modules/SurgicalNavigation` 的未提交改动"）→ 在对应 diff 后追加 `-- <path>`：
    - 未提交模块改动：`git diff HEAD -- <path>`
    - 某提交内某模块改动：`git diff <commit>^..<commit> -- <path>`
    - 某区间内某模块改动：`git diff <A>..<B> -- <path>` / `git diff <A>...<B> -- <path>`
@@ -59,15 +59,15 @@ description: >
 
 | 专项 skill | 路径信号 | 内容关键词信号 |
 |---|---|---|
-| `render-perf-diagnose` | `src/Image/VTKRenderViewer/`、`PluginSegmentView`、`PluginMitkCasePreview`、`casepreviewview`、`*View*Wgt`、`ViewPanel*` | `vtk`、`itk`、`mitk`、`RenderingManager`、`vtkMapper`、`volume`、`reslice`、`RequestUpdate`、`level window`、`marching`、`actor`、`renderer`、渲染/刷新/掉帧 |
+| `render-perf-diagnose` | 影像/分割/渲染/预览模块：`*Image*`、`*Render*`、`*Renderer*`、`*Viewer*`、`*View*`、`*ViewPanel*`、`*VTK*`、`*ITK*`、`*MITK*`、`*Segment*`、`*Seg*`、`*Volume*`、`*Mesh*`、影像/分割/渲染/预览/体绘制 | `vtk`、`itk`、`mitk`、`RenderingManager`、`vtkMapper`、`volume`、`reslice`、`RequestUpdate`、`level window`、`marching`、`actor`、`renderer`、渲染/刷新/掉帧 |
 | `qt-review` | 任意 `.cpp/.h/.ui` 含 Qt | `connect(`、`SIGNAL(`/`SLOT(`、`moveToThread`、`QThread`、`connectNotify`/`emitNotify`、`deleteLater`、`QTimer`、`blockSignals`、`QSortFilterProxyModel`、`setModel`、`QDialog::exec`、`QByteArray`/`readyRead`(拆包) |
-| `cpp-concurrency-review` | 设备插件 `PluginBase*Board`、`PluginOTS`、`PluginBaseOTS`、`*Thread*`、`SerialPort*`、`TcpServer` | `std::thread`、`std::mutex`、`std::atomic`、`QMutex`、`QWaitCondition`、`QSemaphore`、`detach`、`run()` 循环、`volatile`、心跳/worker |
-| `geometry-transform-review` | `src/Algorithm/GeometryAlgorithm/`、`Transforms3d`、`PluginSurgicalNavigatView`、`PluginRegistrationTransformationView`、`PluginToolRegistrationView`、`commonData.h` | `Eigen`、`Matrix4`、`Matrix3`、`Quat`、`Quaternion`、`pose`、`Transform`、`inverse()`、`transpose()`、`normalize`、`acos`、`registration`/配准、`Direction`/`spacing`/`origin`、`LPS`/`RAS`、`float[16]`、`vtkMatrix` |
-| `surgical-safety-review` | `PluginSurgicalPlanView`、`PluginSurgicalConfigView`、`PluginSurgicalNavigatView`、`PluginBaseRoboticArm`、`PluginBase*Board`、`MainView`、`CoreUi` | `OperationState`、阶段切换/门禁、`canEnter`、`m_isMissing`、`heartbeat`/心跳、`timeout`、`ArmMove`/机械臂、使能/enable、`KMessageBox`(确认)、植入物/案例状态、无有效植入物、未选节段、`catch`(吞错)、默认标志位 |
-| `database-integrity-review` | `src/Common/DataBase/`、`src/Common/SQLiteAliasManager/`、`PluginBaseLoginView`、`DB*Impl`、`SQLite*Manager` | `QSqlQuery`、`QSqlDatabase`、`exec(`、`prepare(`、`bindValue`、`QString("...SELECT/INSERT`、`transaction`/`commit`/`rollback`、`lastError`、`loginPass`/password、`hash`、`MAX(` |
+| `cpp-concurrency-review` | 设备/控制板/通信/线程模块：`*Thread*`、`*Worker*`、`*Serial*`、`*Tcp*`、`*Socket*`、`*Board*`、`*Bd*`、`*Ctrl*`、`*Control*`、`*Controller*`、`*IO*`、`*Device*`、`*Comm*`、`*OTS*`、`*Tracker*`、控制板/控制器/通信/采集/心跳 | `std::thread`、`std::mutex`、`std::atomic`、`QMutex`、`QWaitCondition`、`QSemaphore`、`detach`、`run()` 循环、`volatile`、心跳/worker |
+| `geometry-transform-review` | 导航/配准/工具注册/几何算法模块：`*Geometry*`、`*Transform*`、`*Matrix*`、`*Nav*`、`*Navi*`、`*Navigat*`、`*Navigation*`、`*SurgicalNav*`、`*SurgNav*`、`*Reg*`、`*Regis*`、`*Registration*`、`*Register*`、`*ToolReg*`、`*Calib*`、`*Calibration*`、导航/配准/注册/标定/工具 | `Eigen`、`Matrix4`、`Matrix3`、`Quat`、`Quaternion`、`pose`、`Transform`、`inverse()`、`transpose()`、`normalize`、`acos`、`registration`/配准、`Direction`/`spacing`/`origin`、`LPS`/`RAS`、`float[16]`、`vtkMatrix` |
+| `surgical-safety-review` | 导航/规划/机械臂/控制板/阶段门禁模块：`*Nav*`、`*Navi*`、`*Navigation*`、`*Plan*`、`*Planning*`、`*Preop*`、`*PreOp*`、`*Config*`、`*Robot*`、`*Robotic*`、`*RobotArm*`、`*Arm*`、`*Manipulator*`、`*Board*`、`*Bd*`、`*Ctrl*`、`*Control*`、`*Controller*`、`*Safety*`、`*Gate*`、`*Stage*`、导航/规划/术前/机械臂/机器人/控制板/门禁 | `OperationState`、阶段切换/门禁、`canEnter`、`m_isMissing`、`heartbeat`/心跳、`timeout`、`ArmMove`/机械臂、使能/enable、`KMessageBox`(确认)、植入物/案例状态、无有效植入物、未选节段、`catch`(吞错)、默认标志位 |
+| `database-integrity-review` | `*DataBase*`、`*Database*`、`*DB*`、`*SQLite*`、`*Sql*`、`*Login*`、`*Auth*`、`*User*`、`*Case*`、`*Impl` | `QSqlQuery`、`QSqlDatabase`、`exec(`、`prepare(`、`bindValue`、`QString("...SELECT/INSERT`、`transaction`/`commit`/`rollback`、`lastError`、`loginPass`/password、`hash`、`MAX(` |
 | `cross-platform-guard`（默认关） | 仅当出现下列信号才激活 | `#ifdef _WIN32`/`__linux__`、`std::filesystem`、字节序/`<<8`/`htons`、`wchar_t`/`TCHAR`、`dllexport`/visibility、手写协议拆包的字节移位、`fromLocal8Bit`/编码转换、`CMakeLists` 跨平台 |
 
-> 注：项目是 **Windows 专用**，`cross-platform-guard` 默认不激活，仅在出现字节序/编码/`#ifdef`/协议拆包等真实信号时才纳入。
+> 注：`cross-platform-guard` 默认不激活，仅在出现字节序/编码/`#ifdef`/协议拆包/CMake 等真实跨平台信号时才纳入。
 > 若改动只是注释/文案/格式，告知用户"无需专项审查"并停止。
 
 专项 skill 名 ↔ 中文领域名（填子代理 prompt 用）：`render-perf-diagnose`=渲染性能、`qt-review`=Qt、`cpp-concurrency-review`=并发、`geometry-transform-review`=几何变换、`surgical-safety-review`=手术失效安全、`database-integrity-review`=数据库/数据完整性、`cross-platform-guard`=跨平台。
@@ -85,7 +85,7 @@ description: >
 子代理 prompt 模板（`<领域名>`/`<skill名>` 按 Step 2 末尾对照表替换；`<skill名>` 即 `qt-review` 这类目录名）：
 
 ```text
-你是 RSTSystem（脊柱/创伤外科导航机器人）项目的 <领域名> 只读代码审查员。
+你是骨科机器人项目的 <领域名> 只读代码审查员。
 
 请读取并严格遵守这个专项 skill 作为审查标准：<skill名>
 - 若运行时已自动加载该 skill，直接用；
@@ -135,7 +135,7 @@ description: >
 ## 输出格式
 
 ```text
-# RSTSystem 聚合审查报告
+# 骨科机器人项目聚合审查报告
 
 ## 审查范围
 - 范围（diff 区间 / 模块路径）：
@@ -167,7 +167,7 @@ description: >
 
 - **目录**：当前仓库根下的 `docs/code-reviews/`（相对路径，随项目走、不写绝对路径；目录不存在则先创建）。
 - **文件名**：`rst-review-<范围标识>-<YYYYMMDD>.md`
-  - `<范围标识>`：未提交=`working-tree`；某次提交=该 commit 短 hash；区间=`A..B`（清洗成文件名安全字符）；路径过滤 diff=`working-tree-<模块名>` 或 `<区间>-<模块名>`；全量模块=模块目录名（如 `PluginSurgicalNavigatView`）。
+  - `<范围标识>`：未提交=`working-tree`；某次提交=该 commit 短 hash；区间=`A..B`（清洗成文件名安全字符）；路径过滤 diff=`working-tree-<模块名>` 或 `<区间>-<模块名>`；全量模块=模块目录名（如 `SurgicalNavigation`）。
   - `<YYYYMMDD>`：用系统日期命令实际获取，**不要臆造日期**。
   - 若同名已存在，追加 `-2`/`-3` 等，**不覆盖**旧报告。
 - **内容**：写入对话中那份完整报告（审查范围 + 🔴/🟠/🟡 + 待确认）；若导出时修复已完成，追加一段"修复总结"（改了哪些文件、每处目的、已做验证、未验证风险）。

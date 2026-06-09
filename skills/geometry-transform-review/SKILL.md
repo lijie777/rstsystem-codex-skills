@@ -36,7 +36,7 @@ description: Use when reviewing coordinate transforms, pose matrices, registrati
 - [ ] **`inverse()` 换基**：`tPlateCamera = tCameraPlate.inverse(); tPlateProbe = tPlateCamera * tCameraProbe;` 是正确范式。审查 `.inverse()` 出现处，确认求逆的是该求逆的那个、且方向需求确实是反过来。
 
 ### 2. Eigen 矩阵 / 四元数用法
-- [ ] **硬件四元数转旋转矩阵前必须 `.normalize()`**。⚠️ 反模式 `Toolinfo2Matrix4d`(在 `PluginBaseOTS.cpp`、`PluginOTS.cpp`、`RAASettingSecuritySpace.cpp` **三处重复**)：直接 `quat=(qx,qy,qz,q0)` 后 `Quat2Mat(quat)`，**未归一化**，NDI 量化误差直接进旋转矩阵、矩阵非正交、逐级链乘放大。正例 `casepreviewview.cpp`：`probeQuat.normalize()` 后再 `toRotationMatrix()`。这是导航最底层函数，影响全系统精度。
+- [ ] **硬件四元数转旋转矩阵前必须 `.normalize()`**。⚠️ 反模式：OTS/跟踪采集、安全空间或工具转换模块里重复实现 `ToolInfo -> Matrix4d`，直接 `quat=(qx,qy,qz,q0)` 后 `Quat2Mat(quat)`，**未归一化**，NDI/跟踪器量化误差直接进旋转矩阵、矩阵非正交、逐级链乘放大。正例：探针/工具预览姿态计算中先 `probeQuat.normalize()` 再 `toRotationMatrix()`。这是导航最底层函数，影响全系统精度。
 - [ ] **欧拉角函数轴序/单位不一致**。⚠️ `Transforms3d.cpp`：`Mat2Euler` 用 `eulerAngles(0,1,2)`(XYZ)、`Mat2EulerAngle` 用 `eulerAngles(2,1,0)`(ZYX)——**同库两函数轴序相反**；`eulerAngles` 本身有 ±π/万向锁歧义。审查欧拉角往返转换是否同轴序、是否必要(能用矩阵/四元数就别转欧拉角)。
 - [ ] **`inverse()` vs `transpose()`**：纯旋转正交矩阵两者等价但 `transpose()` 更快更稳；含平移的齐次矩阵**只能 `inverse()`**，用 `transpose()` 是错的。确认对 4x4 齐次矩阵没用 transpose 当逆。
 - [ ] **矩阵未初始化**：手填部分元素前应 `setIdentity()`。`RAASettingSecuritySpace::toolinfo2Matrix4d` 的 `Matrix4d m_NDI2Ref_Trans` 未 setIdentity(此处恰好全覆盖，但属脆弱写法)。
@@ -53,7 +53,7 @@ description: Use when reviewing coordinate transforms, pose matrices, registrati
 
 ### 5. 单位混淆 mm / 度 / 弧度
 - [ ] **角度/弧度入口靠命名前缀区分，传错即全姿态错**。⚠️ `Transforms3d.cpp`：`EulerAngle2Mat`(入参**度**，内部 `Degrees()` 转弧度) vs `Euler2Mat`(入参**弧度**直接用)；`rotate()` 入参度、`AngleAxisPos_to_T` 入参弧度。审查每个调用：函数期望单位 vs 实参单位是否一致。
-- [ ] **角度换算常量散落、多份 `#define`**。`Transforms3d.h`/`PluginPowerTool.cpp`/`SecurityPanelCal.h` 各自 `#define pi_df/rad_df/deg_df`，新代码又用 `Constants::kPi`——混用易错。建议统一常量。
+- [ ] **角度换算常量散落、多份 `#define`**。几何库、动力工具、安全空间标定等模块各自 `#define pi_df/rad_df/deg_df`，新代码又用 `Constants::kPi`——混用易错。建议统一常量。
 - [ ] **距离单位**：项目统一 mm（`*Mm` 后缀是好范式）。审查无后缀的长度量是否混入 m/其它。
 
 ### 6. 数值健壮性

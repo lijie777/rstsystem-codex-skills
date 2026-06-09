@@ -1,6 +1,6 @@
-# RSTSystem Agent Skills
+# 骨科机器人 Agent Skills
 
-面向骨科手术机器人研发场景的一组 Codex / Claude Code 审查与诊断 skills。它们来自 RSTSystem 项目的真实 C++/Qt/VTK/MITK 工作流，重点覆盖手术导航、规划、设备通信、医学影像渲染、数据库、跨平台一致性以及失效安全。
+面向骨科手术机器人研发场景的一组 Codex / Claude Code 审查与诊断 skills。它们来自骨科机器人项目的真实 C++/Qt/VTK/MITK 工作流，重点覆盖手术导航、规划、设备通信、医学影像渲染、数据库、跨平台一致性以及失效安全。
 
 > 注意：`rst-review` 现为工具中立的聚合审查入口，Claude Code 与 Codex 都可以使用。Claude Code 运行时使用 Agent 工具调度只读子代理；Codex 运行时使用 `multi_agent_v1.spawn_agent`，没有子代理能力时会降级为主会话顺序审查。其他专项 skill 遵循 Agent Skills 的 `SKILL.md` 基本格式，复制到 `.claude\skills` 或 `.codex\skills` 后即可按名称触发。
 
@@ -94,7 +94,7 @@ $geometry-transform-review 看一下这段配准矩阵链路是否方向写反
 
 ### 1. 日常改动：先跑聚合审查
 
-在 RSTSystem 项目里完成一组未提交改动后，优先使用：
+在骨科机器人项目里完成一组未提交改动后，优先使用：
 
 ```text
 $rst-review 当前修改未提交的文件
@@ -125,7 +125,7 @@ $cpp-concurrency-review 看这个控制板 worker 线程 stop 逻辑是否安全
 
 ## 每个 skill 的用途与用法
 
-### `rst-review`：RSTSystem 聚合审查入口
+### `rst-review`：骨科机器人项目聚合审查入口
 
 适用场景：
 
@@ -141,8 +141,8 @@ $rst-review 当前修改未提交的文件
 $rst-review 审查提交 a1b2c3d 的改动
 $rst-review 审查 a1b2c3d..d4e5f6a 的差异
 $rst-review 审查 main...HEAD 的差异
-$rst-review 审查 src/Plugins/PluginSurgicalNavigatView 的未提交改动
-$rst-review 审查整个 src/Plugins/PluginSurgicalNavigatView 模块
+$rst-review 审查 src/Modules/SurgicalNavigation 的未提交改动
+$rst-review 审查整个 src/Modules/SurgicalNavigation 模块
 $rst-review 当前修改未提交的文件 --export
 ```
 
@@ -153,8 +153,8 @@ $rst-review 当前修改未提交的文件 --export
 /rst-review 审查提交 a1b2c3d 的改动
 /rst-review 审查 a1b2c3d..d4e5f6a 的差异
 /rst-review 审查 main...HEAD 的差异
-/rst-review 审查 src/Plugins/PluginSurgicalNavigatView 的未提交改动
-/rst-review 审查整个 src/Plugins/PluginSurgicalNavigatView 模块
+/rst-review 审查 src/Modules/SurgicalNavigation 的未提交改动
+/rst-review 审查整个 src/Modules/SurgicalNavigation 模块
 /rst-review 当前修改未提交的文件 --export
 ```
 
@@ -166,9 +166,9 @@ $rst-review 当前修改未提交的文件 --export
 | 审查某次提交的改动 | `$rst-review 审查提交 a1b2c3d 的改动` | `/rst-review 审查提交 a1b2c3d 的改动` | `git diff a1b2c3d^..a1b2c3d` 或等价 `git show a1b2c3d` |
 | 审查两个提交差异 | `$rst-review 审查 a1b2c3d..d4e5f6a 的差异` | `/rst-review 审查 a1b2c3d..d4e5f6a 的差异` | `git diff a1b2c3d..d4e5f6a` |
 | 审查分支差异 | `$rst-review 审查 main...HEAD 的差异` | `/rst-review 审查 main...HEAD 的差异` | `git diff main...HEAD`，适合看当前分支相对 main 的改动 |
-| 审查某模块的未提交改动 | `$rst-review 审查 src/Plugins/PluginSurgicalNavigatView 的未提交改动` | `/rst-review 审查 src/Plugins/PluginSurgicalNavigatView 的未提交改动` | `git diff HEAD -- src/Plugins/PluginSurgicalNavigatView` |
-| 审查某模块在某区间内的改动 | `$rst-review 审查 main...HEAD 中 src/Plugins/PluginSurgicalNavigatView 的改动` | `/rst-review 审查 main...HEAD 中 src/Plugins/PluginSurgicalNavigatView 的改动` | `git diff main...HEAD -- src/Plugins/PluginSurgicalNavigatView` |
-| 审查某个模块现有全部代码 | `$rst-review 审查整个 src/Plugins/PluginSurgicalNavigatView 模块` | `/rst-review 审查整个 src/Plugins/PluginSurgicalNavigatView 模块` | 全量模块模式，读取目录下源码全文，不依赖 git diff |
+| 审查某模块的未提交改动 | `$rst-review 审查 src/Modules/SurgicalNavigation 的未提交改动` | `/rst-review 审查 src/Modules/SurgicalNavigation 的未提交改动` | `git diff HEAD -- src/Modules/SurgicalNavigation` |
+| 审查某模块在某区间内的改动 | `$rst-review 审查 main...HEAD 中 src/Modules/SurgicalNavigation 的改动` | `/rst-review 审查 main...HEAD 中 src/Modules/SurgicalNavigation 的改动` | `git diff main...HEAD -- src/Modules/SurgicalNavigation` |
+| 审查某个模块现有全部代码 | `$rst-review 审查整个 src/Modules/SurgicalNavigation 模块` | `/rst-review 审查整个 src/Modules/SurgicalNavigation 模块` | 全量模块模式，读取目录下源码全文，不依赖 git diff |
 | 导出当前未提交改动报告 | `$rst-review 当前修改未提交的文件 --export` | `/rst-review 当前修改未提交的文件 --export` | 同时在对话输出，并写入 `docs/code-reviews/` |
 
 范围写法说明：
@@ -177,7 +177,7 @@ $rst-review 当前修改未提交的文件 --export
 - `main...HEAD` 表示当前分支相对 main 的合并基差异，适合功能分支自查。
 - 命令里包含路径且包含“未提交/改动/diff/提交/分支差异”等词时，按路径过滤 diff 处理。
 - 命令里包含路径且明确说“整个模块/全量/现有代码”时，按全量模块审查处理。
-- 路径建议写仓库相对路径，例如 `src/Plugins/PluginSurgicalNavigatView`，不要写本机绝对路径。
+- 路径建议写仓库相对路径，例如 `src/Modules/SurgicalNavigation`，不要写本机绝对路径。
 
 导出报告：
 
@@ -185,7 +185,7 @@ $rst-review 当前修改未提交的文件 --export
 $rst-review 当前修改未提交的文件 --export
 /rst-review 当前修改未提交的文件 --export
 $rst-review 审查 main...HEAD 的差异，导出报告
-/rst-review 审查 src/Plugins/PluginSurgicalNavigatView 的未提交改动，并导出报告
+/rst-review 审查 src/Modules/SurgicalNavigation 的未提交改动，并导出报告
 ```
 
 导出规则：
@@ -194,7 +194,7 @@ $rst-review 审查 main...HEAD 的差异，导出报告
 - 只有命令里明确包含 `--export`、`导出报告`、`存档报告` 这类要求时才落盘。
 - 输出目录固定为当前项目仓库内的 `docs/code-reviews/`。
 - 文件名格式为 `rst-review-<范围标识>-<YYYYMMDD>.md`。
-- 常见文件名示例：`rst-review-working-tree-20260609.md`、`rst-review-main...HEAD-20260609.md`、`rst-review-working-tree-PluginSurgicalNavigatView-20260609.md`。
+- 常见文件名示例：`rst-review-working-tree-20260609.md`、`rst-review-main...HEAD-20260609.md`、`rst-review-working-tree-SurgicalNavigation-20260609.md`。
 - 如果同名文件已存在，会追加 `-2`、`-3`，不会覆盖旧报告。
 
 内部流程：
@@ -230,7 +230,7 @@ $rst-review 审查 main...HEAD 的差异，导出报告
 输出报告大致长这样：
 
 ```text
-# RSTSystem 聚合审查报告
+# 骨科机器人项目聚合审查报告
 
 ## 审查范围
 - 范围：未提交改动 / main...HEAD / 指定模块路径
@@ -276,7 +276,7 @@ $rst-review 审查 main...HEAD 的差异，导出报告
 - Qt Widgets、手写 `setupUi()`、`.ui` 文件、model/view 逻辑。
 - `connect`、`SIGNAL/SLOT`、`Qt::DirectConnection`、`QTimer`、`QThread`、`moveToThread`。
 - QObject parent/生命周期、`deleteLater`、跨线程 UI 访问。
-- RSTSystem 自研 `connectNotify/emitNotify` 通知总线。
+- 项目自研 `connectNotify/emitNotify` 通知总线。
 
 典型用法：
 
@@ -454,7 +454,7 @@ $cross-platform-guard 看这个协议包解析在 Windows/Linux 是否一致
 
 适合：
 
-- RSTSystem 或类似骨科机器人、导航机器人项目。
+- 骨科机器人、导航机器人或类似医疗机器人项目。
 - C++/Qt/VTK/MITK/ITK/Eigen/CMake 技术栈。
 - 医学影像、导航几何、机器人设备通信、数据库持久化相关审查。
 
@@ -469,7 +469,7 @@ $cross-platform-guard 看这个协议包解析在 Windows/Linux 是否一致
 
 ## 维护建议
 
-- 当 RSTSystem 新增模块、数据库表、坐标系或设备协议时，同步更新对应专项 skill。
+- 当项目新增模块、数据库表、坐标系或设备协议时，同步更新对应专项 skill。
 - 对真实线上 bug 进行复盘后，把“形状”和“修法”补进 skill 的本项目易错点。
 - `rst-review` 的路由表要保持轻量，只负责分发；专项细则放在各自 skill 内。
 - 对 Claude Code / Codex 以外的兼容 Agent 使用时，可以复用专项清单和聚合流程；如果该运行时没有等价子代理接口，则按主会话顺序审查执行。
