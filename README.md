@@ -214,6 +214,7 @@ $rst-review 审查 main...HEAD 的差异，导出报告
 
 - 默认只在对话里输出报告，不写文件。
 - 只有命令里明确包含 `--export`、`导出报告`、`存档报告` 这类要求时才落盘。
+- 启用导出时，当前会话仍必须完整显示检测出来的问题项、分级、来源专项、修法和待确认清单；导出文件只是额外存档，不能用文件路径替代报告正文。
 - 输出目录固定为当前项目仓库内的 `docs/code-reviews/`。
 - 文件名格式为 `rst-review-<范围标识>-<YYYYMMDD>.md`。
 - 常见文件名示例：`rst-review-working-tree-20260609.md`、`rst-review-main...HEAD-20260609.md`、`rst-review-working-tree-SurgicalNavigation-20260609.md`。
@@ -282,7 +283,7 @@ $rst-review 审查 main...HEAD 的差异，导出报告
 - 日常开发先用 `rst-review` 做聚合审查；如果报告里某个领域风险很高，再单独调用对应专项 skill 复核。
 - 小改动如果只命中一个领域，`rst-review` 可能会直接套专项 checklist，不一定启动子代理，这是为了减少调度成本。
 - 审查阶段默认只读，不自动修代码、不提交、不主动运行 CMake 构建或测试。
-- 如果需要把审查报告落盘，可在命令里明确写 `--export` 或“导出报告”，报告会写到项目内的 `docs/code-reviews/`。
+- 如果需要把审查报告落盘，可在命令里明确写 `--export` 或“导出报告”，报告会写到项目内的 `docs/code-reviews/`，同时当前会话仍会显示完整问题清单。
 
 重要限制：
 
