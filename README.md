@@ -1,8 +1,8 @@
 # 骨科机器人 Agent Skills
 
-面向骨科手术机器人研发场景的一组 Codex / Claude Code 审查与诊断 skills。它们来自骨科机器人项目的真实 C++/Qt/VTK/MITK 工作流，重点覆盖手术导航、规划、设备通信、医学影像渲染、数据库、跨平台一致性以及失效安全。
+面向骨科机器人研发场景的一组 Codex / Claude Code 审查与诊断 skills。它们来自骨科机器人项目的真实 C++/Qt/VTK/MITK 工作流，重点覆盖手术导航、规划、设备通信、医学影像渲染、数据库、跨平台一致性以及失效安全。
 
-> 注意：`rst-review` 现为工具中立的聚合审查入口，Claude Code 与 Codex 都可以使用。Claude Code 运行时使用 Agent 工具调度只读子代理；Codex 运行时使用 `multi_agent_v1.spawn_agent`，没有子代理能力时会降级为主会话顺序审查。其他专项 skill 遵循 Agent Skills 的 `SKILL.md` 基本格式，复制到 `.claude\skills` 或 `.codex\skills` 后即可按名称触发。
+> 注意：`rst-review` 现为工具中立的聚合审查入口，Claude Code 与 Codex 都可以使用。Claude Code 运行时使用 Agent 工具调度只读子代理；Codex 运行时使用 `multi_agent_v1.spawn_agent`，没有子代理能力时会降级为主会话顺序审查。`rst-route-sync` 用于把当前项目模块结构同步进 `rst-review` 的领域路由表，适合换项目或新增模块后先执行一次。其他专项 skill 遵循 Agent Skills 的 `SKILL.md` 基本格式，复制到 `.claude\skills` 或 `.codex\skills` 后即可按名称触发。
 
 ## 使用背景：骨科机器人软件研发
 
@@ -15,7 +15,7 @@
 - MySQL/SQLite 查询失败静默返回空，病例或植入物配置被写坏。
 - Windows/Linux 编译器、编码、路径、ABI 差异导致只在某个平台失败。
 
-这 8 个 skill 的目标是把这些经验固化为可复用的审查清单和 Agent 工作流，让每次改动都能按领域路由到合适的专项审查。
+这 9 个 skill 的目标是把这些经验固化为可复用的审查清单、路由同步能力和 Agent 工作流，让每次改动都能按领域路由到合适的专项审查。
 
 ## 覆盖技术栈
 
@@ -32,6 +32,8 @@
 ```text
 skills/
   rst-review/
+    SKILL.md
+  rst-route-sync/
     SKILL.md
   qt-review/
     SKILL.md
@@ -84,6 +86,8 @@ Copy-Item -Path $source -Destination $target -Recurse -Force
 ```text
 $rst-review 当前修改未提交的文件
 /rst-review 当前修改未提交的文件
+$rst-route-sync 同步路由表
+/rst-route-sync 同步路由表
 $qt-review 帮我审查这个 Qt widget 的信号槽和生命周期
 /qt-review 帮我审查这个 Qt widget 的信号槽和生命周期
 $geometry-transform-review 看一下这段配准矩阵链路是否方向写反
@@ -91,6 +95,24 @@ $geometry-transform-review 看一下这段配准矩阵链路是否方向写反
 ```
 
 ## 推荐使用方式
+
+### 0. 新项目或新增模块：先同步路由表
+
+如果把这套 skills 用到一个新的骨科机器人项目，或当前项目新增了导航、规划、机械臂、控制板、配准、渲染、数据库等模块，先运行：
+
+```text
+$rst-route-sync 同步路由表
+/rst-route-sync 同步路由表
+```
+
+它会扫描当前项目模块结构，判断哪些模块应归入 `rst-review` 的 7 个领域，并把缺失的路径信号追加到 Codex / Claude Code 两份 `rst-review/SKILL.md` 的 Step 2 路由表中。默认模式会先输出拟新增清单，等用户确认后再写；如果你已经确认要自动追加路径信号，可使用：
+
+```text
+$rst-route-sync --auto
+/rst-route-sync --auto
+```
+
+同步完成后，再用 `rst-review` 审查未提交改动、提交区间或指定模块，路由命中会更完整。
 
 ### 1. 日常改动：先跑聚合审查
 
@@ -269,6 +291,77 @@ $rst-review 审查 main...HEAD 的差异，导出报告
 - 它是审查入口，不直接替代各专项 skill。
 - 审查阶段只读，不应自动修改代码或运行 CMake 构建。
 
+### `rst-route-sync`：rst-review 路由表同步器
+
+适用场景：
+
+- 换到新的骨科机器人项目后，模块命名和当前 `rst-review` Step 2 路由表不一致。
+- 当前项目新增了导航、规划、机械臂、控制板、配准、渲染、数据库、设备通信等模块，希望 `rst-review` 能正确命中相关专项。
+- 想只追加缺失路径信号，保留原有路由表，不重写、不删除、不改变审查逻辑。
+- Claude Code 与 Codex 两边都安装了 `rst-review`，需要两份路由表保持一致。
+
+在 Codex 中使用：
+
+```text
+$rst-route-sync 同步路由表
+$rst-route-sync 更新 rst-review 路由
+$rst-route-sync 补全触发词
+$rst-route-sync 让 rst-review 认得这个项目
+$rst-route-sync --auto
+```
+
+在 Claude Code 中使用：
+
+```text
+/rst-route-sync 同步路由表
+/rst-route-sync 更新 rst-review 路由
+/rst-route-sync 补全触发词
+/rst-route-sync 让 rst-review 认得这个项目
+/rst-route-sync --auto
+```
+
+默认工作方式：
+
+1. 定位当前项目根目录，以及 Codex / Claude Code 已安装的 `rst-review/SKILL.md`。
+2. 比对两份 `rst-review` 的 Step 2 路由表；如果两份不一致，先停下让用户选择基准。
+3. 扫描当前项目模块目录，例如 `src/Plugins/*`、`src/Image/*`、`src/Algorithm/*`、`src/Common/*`、`src/Kernel/*`、`src/Application/*`。
+4. 按语义判断每个模块应归入哪些领域：渲染、Qt、并发、几何变换、手术安全、数据库、跨平台。
+5. 与现有路径信号做差集，只列出尚未覆盖的模块和领域。
+6. 默认先输出拟新增清单，等待用户确认后再写入。
+7. 写入时只追加 Step 2 表格里的“路径信号”列，不修改内容关键词、分级规则、审查流程或输出格式。
+
+`--auto` 模式：
+
+- 会跳过确认，直接追加“路径信号”类新增项。
+- 仍然不会自动写入跨平台建议，因为 `cross-platform-guard` 在 `rst-review` 中默认保持谨慎触发。
+- 仍然不会自动写入内容关键词建议，这类建议只在用户明确点名时才应加入。
+- 写完后会重新读取 Codex / Claude Code 两份 `rst-review`，确认新增信号存在、旧信号保留、两份内容一致。
+
+输出重点：
+
+- 当前项目根目录。
+- 扫描到的模块数量。
+- 已覆盖和待新增的模块。
+- 按领域分组的拟新增路径信号。
+- 每条新增的理由和置信度。
+- 未分类模块清单。
+- 仅建议、不默认写入的跨平台信号和内容关键词。
+- Codex / Claude Code 两份 `rst-review` 是否一致。
+
+使用建议：
+
+- 第一次把本仓库安装到一个新项目后，先运行一次 `rst-route-sync`，再运行 `rst-review`。
+- 大规模新增模块、模块改名、插件目录重组后，再运行一次 `rst-route-sync`。
+- 平时小范围改代码，不需要每次都运行；直接用 `rst-review` 审查当前 diff 即可。
+- 如果拟新增清单里出现明显误分类，先让用户调整清单，不要直接 `--auto`。
+
+重要限制：
+
+- 它只维护 `rst-review` 的路由命中能力，不做代码审查，也不替代各专项 skill。
+- 它只追加路径信号，不删除旧信号，不合并或重写整个表格。
+- 它不主动运行 CMake、构建或测试。
+- 如果 Codex / Claude Code 只安装了一份 `rst-review`，就只更新存在的那份，并在结果中说明另一份缺失。
+
 ### `qt-review`：Qt 运行时与 UI 审查
 
 适用场景：
@@ -444,11 +537,12 @@ $cross-platform-guard 看这个协议包解析在 Windows/Linux 是否一致
 ## 聚合审查建议流程
 
 1. 先用 `git status -sb`、`git diff --stat` 确定范围。
-2. 使用 `$rst-review 当前修改未提交的文件` 或 `/rst-review 当前修改未提交的文件` 做聚合审查。
-3. 对高风险结论，再直接调用对应专项复核。
-4. 用户确认修复项后再改代码。
-5. 修复后做轻量验证：`git diff --check`、目标 `rg`、源码检查。
-6. 构建/运行/CMake 验证只在用户明确要求时执行，避免在大型医疗软件仓库里无意触发长时间构建。
+2. 如果是新项目、模块改名或新增大量模块，先用 `$rst-route-sync 同步路由表` 或 `/rst-route-sync 同步路由表` 更新 `rst-review` 路由表。
+3. 使用 `$rst-review 当前修改未提交的文件` 或 `/rst-review 当前修改未提交的文件` 做聚合审查。
+4. 对高风险结论，再直接调用对应专项复核。
+5. 用户确认修复项后再改代码。
+6. 修复后做轻量验证：`git diff --check`、目标 `rg`、源码检查。
+7. 构建/运行/CMake 验证只在用户明确要求时执行，避免在大型医疗软件仓库里无意触发长时间构建。
 
 ## 适用边界
 
@@ -471,5 +565,5 @@ $cross-platform-guard 看这个协议包解析在 Windows/Linux 是否一致
 
 - 当项目新增模块、数据库表、坐标系或设备协议时，同步更新对应专项 skill。
 - 对真实线上 bug 进行复盘后，把“形状”和“修法”补进 skill 的本项目易错点。
-- `rst-review` 的路由表要保持轻量，只负责分发；专项细则放在各自 skill 内。
+- `rst-review` 的路由表要保持轻量，只负责分发；专项细则放在各自 skill 内。项目结构变化后优先用 `rst-route-sync` 追加路径信号，而不是手工重写整张路由表。
 - 对 Claude Code / Codex 以外的兼容 Agent 使用时，可以复用专项清单和聚合流程；如果该运行时没有等价子代理接口，则按主会话顺序审查执行。
