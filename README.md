@@ -15,7 +15,7 @@
 - MySQL/SQLite 查询失败静默返回空，病例或植入物配置被写坏。
 - Windows/Linux 编译器、编码、路径、ABI 差异导致只在某个平台失败。
 
-这 9 个 skill 的目标是把这些经验固化为可复用的审查清单、路由同步能力和 Agent 工作流，让每次改动都能按领域路由到合适的专项审查。
+这 10 个 skill 的目标是把这些经验固化为可复用的审查清单、路由同步能力和 Agent 工作流，让每次改动都能按领域路由到合适的专项审查。
 
 ## 覆盖技术栈
 
@@ -44,6 +44,8 @@ skills/
   surgical-safety-review/
     SKILL.md
   database-integrity-review/
+    SKILL.md
+  logging-review/
     SKILL.md
   render-perf-diagnose/
     SKILL.md
@@ -129,6 +131,7 @@ $rst-review 当前修改未提交的文件
 - 导航、规划、机械臂、阶段门禁相关改动：路由到 `surgical-safety-review`。
 - 坐标矩阵、配准、Eigen/vtkMatrix、LPS/RAS：路由到 `geometry-transform-review`。
 - SQL、数据库、病例/植入物表：路由到 `database-integrity-review`。
+- 日志宏、日志级别、日志上下文、`qDebug/std::cout` 混用、高频日志风险：路由到 `logging-review`。
 - VTK/MITK/ITK 渲染性能路径：路由到 `render-perf-diagnose`。
 - 线程、锁、worker、串口/TCP、心跳：路由到 `cpp-concurrency-review`。
 - 编码、路径、字节序、CMake、Windows/Linux 差异：路由到 `cross-platform-guard`。
@@ -141,6 +144,7 @@ $rst-review 当前修改未提交的文件
 
 ```text
 $database-integrity-review 审一下病例保存和假体数据库查询
+$logging-review 审一下这次改动的日志是否足够且不过量
 $render-perf-diagnose 诊断这个 MITK 视图拖动时掉帧的原因
 $cpp-concurrency-review 看这个控制板 worker 线程 stop 逻辑是否安全
 ```
@@ -501,6 +505,30 @@ $database-integrity-review 看这个假体数据库查询是否会静默失败
 - 明文密码、默认弱口令、hash 存储和比对不一致。
 - `QSqlDatabase` 单例跨线程共享。
 - 关键字段无约束或无写前校验。
+
+### `logging-review`：业务日志设计与审查
+
+适用场景：
+
+- 给关键业务类、设备通信、状态机、病例/规划/导航保存流程设计日志点。
+- 审查 `LOG_*`、`DB_LOG_*`、`qDebug`、`std::cout/std::cerr` 等日志改动。
+- 判断日志是否足够、是否过量、级别是否正确、上下文是否可追溯。
+
+典型用法：
+
+```text
+$logging-review 审一下这次改动的日志是否足够且不过量
+$logging-review 给 SurgicalPlanWidget 的保存流程设计日志方案
+```
+
+关注问题：
+
+- 关键操作、错误路径、外部通信和状态切换缺少可追溯日志。
+- 高频刷新、渲染、采样、逐帧位姿路径写入常规 INFO 日志。
+- `qDebug/std::cout/std::cerr` 绕过统一日志系统。
+- `LOG_*` 使用 `%s/%d` 或字符串拼接，和 spdlog/fmt 风格不一致。
+- 日志级别膨胀或不足，安全失效没有使用 `LOG_ERROR` 和可见告警。
+- 日志缺少 caseId、路径、状态、错误码等关键上下文，或写入患者 PHI。
 
 ### `render-perf-diagnose`：ITK/VTK/MITK 渲染性能诊断
 
