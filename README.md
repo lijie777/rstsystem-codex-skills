@@ -134,22 +134,68 @@ $cpp-concurrency-review 看这个控制板 worker 线程 stop 逻辑是否安全
 - 想审某个提交、分支区间或模块目录，而不是只看当前工作区。
 - 希望 Claude Code 或 Codex 在具备子代理能力时并行做只读审查，再由主会话统一合并、去重和分级。
 
-典型用法：
+在 Codex 中使用：
 
 ```text
 $rst-review 当前修改未提交的文件
-/rst-review 当前修改未提交的文件
-$rst-review 审查 src/Plugins/PluginSurgicalNavigatView 的改动
-/rst-review 审查 src/Plugins/PluginSurgicalNavigatView 的改动
-$rst-review 对 main...HEAD 做综合审查
-/rst-review 对 main...HEAD 做综合审查
+$rst-review 审查提交 a1b2c3d 的改动
+$rst-review 审查 a1b2c3d..d4e5f6a 的差异
+$rst-review 审查 main...HEAD 的差异
+$rst-review 审查 src/Plugins/PluginSurgicalNavigatView 的未提交改动
+$rst-review 审查整个 src/Plugins/PluginSurgicalNavigatView 模块
+$rst-review 当前修改未提交的文件 --export
 ```
 
-审查目标支持三类：
+在 Claude Code 中使用：
 
-- **未提交改动**：不带参数时默认审 `git diff HEAD`，也就是工作区和暂存区相对 HEAD 的变化。
-- **提交或分支区间**：传入 commit、`A..B`、`main...HEAD` 等范围时，审对应 diff。
-- **整个模块/目录**：传入 `src/Plugins/PluginSurgicalNavigatView` 这类路径时，按全量模块模式审该目录下相关源码。
+```text
+/rst-review 当前修改未提交的文件
+/rst-review 审查提交 a1b2c3d 的改动
+/rst-review 审查 a1b2c3d..d4e5f6a 的差异
+/rst-review 审查 main...HEAD 的差异
+/rst-review 审查 src/Plugins/PluginSurgicalNavigatView 的未提交改动
+/rst-review 审查整个 src/Plugins/PluginSurgicalNavigatView 模块
+/rst-review 当前修改未提交的文件 --export
+```
+
+常见场景和实际审查范围：
+
+| 场景 | Codex 写法 | Claude Code 写法 | 实际范围 |
+|---|---|---|---|
+| 审查当前未提交改动 | `$rst-review 当前修改未提交的文件` | `/rst-review 当前修改未提交的文件` | `git diff HEAD`，覆盖工作区和暂存区相对 HEAD 的变化 |
+| 审查某次提交的改动 | `$rst-review 审查提交 a1b2c3d 的改动` | `/rst-review 审查提交 a1b2c3d 的改动` | `git diff a1b2c3d^..a1b2c3d` 或等价 `git show a1b2c3d` |
+| 审查两个提交差异 | `$rst-review 审查 a1b2c3d..d4e5f6a 的差异` | `/rst-review 审查 a1b2c3d..d4e5f6a 的差异` | `git diff a1b2c3d..d4e5f6a` |
+| 审查分支差异 | `$rst-review 审查 main...HEAD 的差异` | `/rst-review 审查 main...HEAD 的差异` | `git diff main...HEAD`，适合看当前分支相对 main 的改动 |
+| 审查某模块的未提交改动 | `$rst-review 审查 src/Plugins/PluginSurgicalNavigatView 的未提交改动` | `/rst-review 审查 src/Plugins/PluginSurgicalNavigatView 的未提交改动` | `git diff HEAD -- src/Plugins/PluginSurgicalNavigatView` |
+| 审查某模块在某区间内的改动 | `$rst-review 审查 main...HEAD 中 src/Plugins/PluginSurgicalNavigatView 的改动` | `/rst-review 审查 main...HEAD 中 src/Plugins/PluginSurgicalNavigatView 的改动` | `git diff main...HEAD -- src/Plugins/PluginSurgicalNavigatView` |
+| 审查某个模块现有全部代码 | `$rst-review 审查整个 src/Plugins/PluginSurgicalNavigatView 模块` | `/rst-review 审查整个 src/Plugins/PluginSurgicalNavigatView 模块` | 全量模块模式，读取目录下源码全文，不依赖 git diff |
+| 导出当前未提交改动报告 | `$rst-review 当前修改未提交的文件 --export` | `/rst-review 当前修改未提交的文件 --export` | 同时在对话输出，并写入 `docs/code-reviews/` |
+
+范围写法说明：
+
+- `A..B` 表示从 A 到 B 的直接差异，适合比较两个明确提交。
+- `main...HEAD` 表示当前分支相对 main 的合并基差异，适合功能分支自查。
+- 命令里包含路径且包含“未提交/改动/diff/提交/分支差异”等词时，按路径过滤 diff 处理。
+- 命令里包含路径且明确说“整个模块/全量/现有代码”时，按全量模块审查处理。
+- 路径建议写仓库相对路径，例如 `src/Plugins/PluginSurgicalNavigatView`，不要写本机绝对路径。
+
+导出报告：
+
+```text
+$rst-review 当前修改未提交的文件 --export
+/rst-review 当前修改未提交的文件 --export
+$rst-review 审查 main...HEAD 的差异，导出报告
+/rst-review 审查 src/Plugins/PluginSurgicalNavigatView 的未提交改动，并导出报告
+```
+
+导出规则：
+
+- 默认只在对话里输出报告，不写文件。
+- 只有命令里明确包含 `--export`、`导出报告`、`存档报告` 这类要求时才落盘。
+- 输出目录固定为当前项目仓库内的 `docs/code-reviews/`。
+- 文件名格式为 `rst-review-<范围标识>-<YYYYMMDD>.md`。
+- 常见文件名示例：`rst-review-working-tree-20260609.md`、`rst-review-main...HEAD-20260609.md`、`rst-review-working-tree-PluginSurgicalNavigatView-20260609.md`。
+- 如果同名文件已存在，会追加 `-2`、`-3`，不会覆盖旧报告。
 
 内部流程：
 

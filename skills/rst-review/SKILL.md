@@ -29,15 +29,19 @@ description: >
 
 ## Step 1 — 确定审查目标与模式
 
-支持两种模式，先判断用户要哪种（不清楚就问一句"审这次改动，还是审整个模块的现有代码？"）：
+支持两种模式，先判断用户要哪种（不清楚就问一句"审这次改动，还是审整个模块的现有代码？"）。如果请求里同时出现路径和"未提交/改动/diff/提交/分支差异"等词，优先按**路径过滤 diff**处理；只有用户说"整个模块/全量/现有代码/审这个目录本身"时，才进入全量模块审查。
 
 ### 模式 A — 改动审查（diff 模式，默认）
 审"变化了什么"。按优先级：
 1. 用户给了 **git ref / 区间**（如某 commit、`A..B`、`main...HEAD`）→ 审对应 diff：
    - 单个提交：`git show <commit>` 或 `git diff <commit>^..<commit>`
    - 区间/分支差异：`git diff <A>..<B>` / `<A>...<B>` / `<commit>..HEAD`
-2. 无参数 → **未提交改动**：`git diff HEAD`（工作区 + 暂存区 vs HEAD）。
-3. 工作区干净 → 回退审**当前分支相对 main 的全部改动**：`git diff main...HEAD`。
+2. 用户给了 **路径过滤条件**（如"审查 `src/Plugins/PluginSurgicalNavigatView` 的未提交改动"）→ 在对应 diff 后追加 `-- <path>`：
+   - 未提交模块改动：`git diff HEAD -- <path>`
+   - 某提交内某模块改动：`git diff <commit>^..<commit> -- <path>`
+   - 某区间内某模块改动：`git diff <A>..<B> -- <path>` / `git diff <A>...<B> -- <path>`
+3. 无参数 → **未提交改动**：`git diff HEAD`（工作区 + 暂存区 vs HEAD）。
+4. 工作区干净 → 回退审**当前分支相对 main 的全部改动**：`git diff main...HEAD`。
 
 以上 git 命令均在**项目仓库根目录**执行（不写死绝对路径，便于他人/其它机器复用）；先用 `git diff --stat` 拿改动文件清单，再做 Step 2 领域路由。
 
@@ -163,7 +167,7 @@ description: >
 
 - **目录**：当前仓库根下的 `docs/code-reviews/`（相对路径，随项目走、不写绝对路径；目录不存在则先创建）。
 - **文件名**：`rst-review-<范围标识>-<YYYYMMDD>.md`
-  - `<范围标识>`：未提交=`working-tree`；某次提交=该 commit 短 hash；区间=`A..B`（清洗成文件名安全字符）；全量模块=模块目录名（如 `PluginSurgicalNavigatView`）。
+  - `<范围标识>`：未提交=`working-tree`；某次提交=该 commit 短 hash；区间=`A..B`（清洗成文件名安全字符）；路径过滤 diff=`working-tree-<模块名>` 或 `<区间>-<模块名>`；全量模块=模块目录名（如 `PluginSurgicalNavigatView`）。
   - `<YYYYMMDD>`：用系统日期命令实际获取，**不要臆造日期**。
   - 若同名已存在，追加 `-2`/`-3` 等，**不覆盖**旧报告。
 - **内容**：写入对话中那份完整报告（审查范围 + 🔴/🟠/🟡 + 待确认）；若导出时修复已完成，追加一段"修复总结"（改了哪些文件、每处目的、已做验证、未验证风险）。
