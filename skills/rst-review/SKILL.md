@@ -2,7 +2,7 @@
 name: rst-review
 description: >
   骨科机器人项目改动聚合审查调度器：自动判断本次代码改动涉及
-  哪些领域(渲染/Qt/并发/几何变换/手术安全/数据库/跨平台)，调用对应的专项审查 skill，
+  哪些领域(渲染/Qt/并发/几何变换/手术安全/数据库/业务日志/跨平台)，调用对应的专项审查 skill，
   在运行时支持子代理时并行审查，把多边发现合并、去重、分级成一份报告，再逐条交用户
   确认、由当前会话实施修复。一条命令覆盖一个改动涉及的全部专项视角，省去手动逐个调用。
   本 skill 为工具中立设计，Claude Code 与 Codex（及其它兼容 Agent Skills 的工具）均可直接使用。
@@ -65,12 +65,14 @@ description: >
 | `geometry-transform-review` | 导航/配准/工具注册/几何算法模块：`*Geometry*`、`*Transform*`、`*Matrix*`、`*Nav*`、`*Navi*`、`*Navigat*`、`*Navigation*`、`*SurgicalNav*`、`*SurgNav*`、`*Reg*`、`*Regis*`、`*Registration*`、`*Register*`、`*ToolReg*`、`*Calib*`、`*Calibration*`、导航/配准/注册/标定/工具 | `Eigen`、`Matrix4`、`Matrix3`、`Quat`、`Quaternion`、`pose`、`Transform`、`inverse()`、`transpose()`、`normalize`、`acos`、`registration`/配准、`Direction`/`spacing`/`origin`、`LPS`/`RAS`、`float[16]`、`vtkMatrix` |
 | `surgical-safety-review` | 导航/规划/机械臂/控制板/阶段门禁模块：`*Nav*`、`*Navi*`、`*Navigation*`、`*Plan*`、`*Planning*`、`*Preop*`、`*PreOp*`、`*Config*`、`*Robot*`、`*Robotic*`、`*RobotArm*`、`*Arm*`、`*Manipulator*`、`*Board*`、`*Bd*`、`*Ctrl*`、`*Control*`、`*Controller*`、`*Safety*`、`*Gate*`、`*Stage*`、导航/规划/术前/机械臂/机器人/控制板/门禁 | `OperationState`、阶段切换/门禁、`canEnter`、`m_isMissing`、`heartbeat`/心跳、`timeout`、`ArmMove`/机械臂、使能/enable、`KMessageBox`(确认)、植入物/案例状态、无有效植入物、未选节段、`catch`(吞错)、默认标志位 |
 | `database-integrity-review` | `*DataBase*`、`*Database*`、`*DB*`、`*SQLite*`、`*Sql*`、`*Login*`、`*Auth*`、`*User*`、`*Case*`、`*Impl` | `QSqlQuery`、`QSqlDatabase`、`exec(`、`prepare(`、`bindValue`、`QString("...SELECT/INSERT`、`transaction`/`commit`/`rollback`、`lastError`、`loginPass`/password、`hash`、`MAX(` |
+| `logging-review` | 日志封装、关键业务流程、设备通信、状态机、病例/规划/导航保存相关改动：`*Log*`、`*Logger*`、`KALog*`、`*Case*`、`*Plan*`、`*Navigat*`、`*Navigation*`、`*Robot*`、`*Arm*`、`*Board*`、`*DB*`、日志/审计/追溯 | `LOG_`、`DB_LOG_`、`LOG_*_CL`、`qDebug`、`qWarning`、`qCritical`、`std::cout`、`std::cerr`、`spdlog`、`SUFFIX`、`KALog`、日志级别、可追溯、审计、保存成功/失败、加载失败、状态切换、心跳、通信回调、错误码、PHI |
 | `cross-platform-guard`（默认关） | 仅当出现下列信号才激活 | `#ifdef _WIN32`/`__linux__`、`std::filesystem`、字节序/`<<8`/`htons`、`wchar_t`/`TCHAR`、`dllexport`/visibility、手写协议拆包的字节移位、`fromLocal8Bit`/编码转换、`CMakeLists` 跨平台 |
 
 > 注：`cross-platform-guard` 默认不激活，仅在出现字节序/编码/`#ifdef`/协议拆包/CMake 等真实跨平台信号时才纳入。
+> 注：`logging-review` 不是无条件激活；只要 diff 涉及 `LOG_` / `DB_LOG_` / `qDebug` / `std::cout` / `std::cerr` 等日志信号就必须激活。若没有日志改动，但触及设备通信、状态机、病例/规划/导航保存、数据库访问或安全门禁，可激活它检查是否缺少关键日志；若完全无日志风险，应在未激活原因里明确说明。
 > 若改动只是注释/文案/格式，告知用户"无需专项审查"并停止。
 
-专项 skill 名 ↔ 中文领域名（填子代理 prompt 用）：`render-perf-diagnose`=渲染性能、`qt-review`=Qt、`cpp-concurrency-review`=并发、`geometry-transform-review`=几何变换、`surgical-safety-review`=手术失效安全、`database-integrity-review`=数据库/数据完整性、`cross-platform-guard`=跨平台。
+专项 skill 名 ↔ 中文领域名（填子代理 prompt 用）：`render-perf-diagnose`=渲染性能、`qt-review`=Qt、`cpp-concurrency-review`=并发、`geometry-transform-review`=几何变换、`surgical-safety-review`=手术失效安全、`database-integrity-review`=数据库/数据完整性、`logging-review`=业务日志、`cross-platform-guard`=跨平台。
 
 ## Step 3 — 并行审查（每个激活专项一个只读子代理，自适应运行时）
 
@@ -141,7 +143,7 @@ description: >
 - 范围（diff 区间 / 模块路径）：
 - 改动/目标文件清单：
 - 激活专项：
-- 未激活专项及原因（含为何未激活 cross-platform）：
+- 未激活专项及原因（含为何未激活 logging-review / cross-platform）：
 
 ## 🔴 阻断级
 1. [文件:行][来源专项|置信度][多领域命中?]
@@ -178,6 +180,7 @@ description: >
 ## 重要提醒
 - 这是**调度器**：真正的审查标准在各专项 skill 里，本 skill 只负责"识别领域 + 编排 + 汇总"。专项 skill 更新了，本 skill 自动受益、无需改动。
 - `cross-platform-guard` 对本项目默认关闭，只有出现真实跨平台/编码/字节序/CMake/协议信号才激活。
+- `logging-review` 按需激活：日志相关 diff 必跑；设备通信、状态机、病例/规划/导航保存、数据库访问、安全门禁等高风险业务路径可跑；完全无日志风险时明确跳过，不要强行输出日志问题。
 - `render-perf-diagnose` 若带 `references/`，仅在进入体绘制或 MITK 刷新深水区时再读取对应 reference。
 - 改动小（1~2 个文件、单一领域）时，不必动用子代理编排，主会话直接套那一个专项 checklist 即可——避免杀鸡用牛刀。
 - 跨线程/几何有效性/设备失联这类问题常横跨多个专项，去重时优先级最高。
