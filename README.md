@@ -129,9 +129,10 @@ $cpp-concurrency-review 看这个控制板 worker 线程 stop 逻辑是否安全
 
 适用场景：
 
-- 想对当前 RSTSystem diff 做一次综合审查。
-- 不确定改动涉及哪些风险领域，需要自动路由专项。
-- 希望当前 Agent 运行时在可用时用只读子代理并行审查 Qt、并发、几何、安全、数据库、渲染、跨平台问题。
+- 当前有一组未提交改动，想一次性审查它是否涉及 Qt、并发、几何变换、手术安全、数据库、渲染性能或跨平台风险。
+- 不确定该手动调用哪个专项 skill，希望先让聚合入口根据路径和 diff 内容自动路由。
+- 想审某个提交、分支区间或模块目录，而不是只看当前工作区。
+- 希望 Claude Code 或 Codex 在具备子代理能力时并行做只读审查，再由主会话统一合并、去重和分级。
 
 典型用法：
 
@@ -144,6 +145,20 @@ $rst-review 对 main...HEAD 做综合审查
 /rst-review 对 main...HEAD 做综合审查
 ```
 
+审查目标支持三类：
+
+- **未提交改动**：不带参数时默认审 `git diff HEAD`，也就是工作区和暂存区相对 HEAD 的变化。
+- **提交或分支区间**：传入 commit、`A..B`、`main...HEAD` 等范围时，审对应 diff。
+- **整个模块/目录**：传入 `src/Plugins/PluginSurgicalNavigatView` 这类路径时，按全量模块模式审该目录下相关源码。
+
+内部流程：
+
+1. 先确认审查范围，读取 `git diff --stat` 或目标目录文件清单。
+2. 按路径和关键词命中专项 skill，例如 Qt、并发、几何、安全、数据库、渲染、跨平台。
+3. 对每个命中的专项启动一个只读审查分支；子代理不可用时，主会话按专项清单顺序审查。
+4. 收集各专项发现，按同一根因去重，并标注来源专项、置信度和严重级别。
+5. 输出审查报告后停止；只有用户逐条确认修复项后，当前会话才进入修改代码阶段。
+
 输出重点：
 
 - 审查范围。
@@ -151,6 +166,55 @@ $rst-review 对 main...HEAD 做综合审查
 - 阻断级、严重、建议问题。
 - 每个问题的文件位置、机理、修法。
 - 待确认的修复项和验证建议。
+
+两个运行分支的差异：
+
+| 对比项 | Claude Code 分支 | Codex 分支 |
+|---|---|---|
+| 常用触发写法 | `/rst-review 当前修改未提交的文件` | `$rst-review 当前修改未提交的文件` |
+| 推荐安装目录 | `%USERPROFILE%\.claude\skills\rst-review\SKILL.md` | `%USERPROFILE%\.codex\skills\rst-review\SKILL.md` |
+| 子代理机制 | 使用 Claude Code 的 Agent 工具 | 使用 Codex 的 `multi_agent_v1.spawn_agent` |
+| 子代理类型 | `subagent_type: general-purpose` | `agent_type: "explorer"` |
+| 模型选择 | 沿用 Claude Code 当前默认模型；如果设置了 `CLAUDE_CODE_SUBAGENT_MODEL`，则由运行时自动使用 | 不主动设置 `model`、`reasoning_effort`、`service_tier`，除非用户明确指定 |
+| 上下文传递 | 给子代理传审查范围、专项 skill 名和必要 diff 摘要 | `fork_context: false`，只传必要范围和专项信息，减少上下文污染 |
+| 专项 skill 查找 | 优先使用已加载 skill；必要时查 `.claude/skills`、`.agents/skills`、`.codex/skills` 等路径 | 优先使用已加载 skill；必要时查 `.codex/skills`、`$CODEX_HOME/skills`、`.agents/skills` 等路径 |
+| 子代理不可用时 | 主会话按命中专项顺序执行 checklist | 主会话按命中专项顺序执行 checklist |
+| 修复阶段 | 用户确认后由当前 Claude Code 会话修复 | 用户确认后由当前 Codex 会话修复 |
+
+输出报告大致长这样：
+
+```text
+# RSTSystem 聚合审查报告
+
+## 审查范围
+- 范围：未提交改动 / main...HEAD / 指定模块路径
+- 改动文件：
+- 激活专项：
+- 未激活专项及原因：
+
+## 阻断级
+1. [文件:行][来源专项|置信度]
+   问题：
+   机理：
+   修法：
+
+## 严重
+...
+
+## 建议
+...
+
+## 待确认
+- 建议修复项：
+- 建议验证：
+```
+
+使用建议：
+
+- 日常开发先用 `rst-review` 做聚合审查；如果报告里某个领域风险很高，再单独调用对应专项 skill 复核。
+- 小改动如果只命中一个领域，`rst-review` 可能会直接套专项 checklist，不一定启动子代理，这是为了减少调度成本。
+- 审查阶段默认只读，不自动修代码、不提交、不主动运行 CMake 构建或测试。
+- 如果需要把审查报告落盘，可在命令里明确写 `--export` 或“导出报告”，报告会写到项目内的 `docs/code-reviews/`。
 
 重要限制：
 
