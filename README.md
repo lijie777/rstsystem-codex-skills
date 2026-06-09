@@ -1,8 +1,8 @@
-# RSTSystem Codex Skills
+# RSTSystem Agent Skills
 
-面向骨科手术机器人研发场景的一组 Codex 审查与诊断 skills。它们来自 RSTSystem 项目的真实 C++/Qt/VTK/MITK 工作流，重点覆盖手术导航、规划、设备通信、医学影像渲染、数据库、跨平台一致性以及失效安全。
+面向骨科手术机器人研发场景的一组 Codex / Claude Code 审查与诊断 skills。它们来自 RSTSystem 项目的真实 C++/Qt/VTK/MITK 工作流，重点覆盖手术导航、规划、设备通信、医学影像渲染、数据库、跨平台一致性以及失效安全。
 
-> 注意：`rst-review` 是 Codex 聚合审查入口，依赖 Codex 的 skill 调度、工具调用和可用时的子代理能力；它只针对 Codex 有效。其他专项 skill 也按 Codex `SKILL.md` 规范编写，迁移到其他 agent 前需要改写触发方式和工具约束。
+> 注意：`rst-review` 现为工具中立的聚合审查入口，Claude Code 与 Codex 都可以使用。Claude Code 运行时使用 Agent 工具调度只读子代理；Codex 运行时使用 `multi_agent_v1.spawn_agent`，没有子代理能力时会降级为主会话顺序审查。其他专项 skill 遵循 Agent Skills 的 `SKILL.md` 基本格式，复制到 `.claude\skills` 或 `.codex\skills` 后即可按名称触发。
 
 ## 使用背景：骨科机器人软件研发
 
@@ -15,7 +15,7 @@
 - MySQL/SQLite 查询失败静默返回空，病例或植入物配置被写坏。
 - Windows/Linux 编译器、编码、路径、ABI 差异导致只在某个平台失败。
 
-这 8 个 skill 的目标是把这些经验固化为可复用的审查清单和 Codex 工作流，让每次改动都能按领域路由到合适的专项审查。
+这 8 个 skill 的目标是把这些经验固化为可复用的审查清单和 Agent 工作流，让每次改动都能按领域路由到合适的专项审查。
 
 ## 覆盖技术栈
 
@@ -54,24 +54,40 @@ skills/
 
 ## 安装方式
 
-在 Windows Codex 环境中，推荐把需要的 skill 目录复制到个人 Codex skills 目录：
+在 Windows 环境中，先克隆仓库：
 
 ```powershell
-# 克隆本仓库
 git clone https://github.com/lijie777/rstsystem-codex-skills.git
+cd .\rstsystem-codex-skills
+```
 
-# 复制全部 skills 到 Codex 个人 skill 目录
-$source = ".\rstsystem-codex-skills\skills\*"
+安装到 Codex：
+
+```powershell
+$source = ".\skills\*"
 $target = "$env:USERPROFILE\.codex\skills"
+New-Item -ItemType Directory -Force -Path $target | Out-Null
 Copy-Item -Path $source -Destination $target -Recurse -Force
 ```
 
-复制后重新打开 Codex 会话，或刷新 skills 列表。之后可以在对话里直接点名 skill，例如：
+安装到 Claude Code：
+
+```powershell
+$source = ".\skills\*"
+$target = "$env:USERPROFILE\.claude\skills"
+New-Item -ItemType Directory -Force -Path $target | Out-Null
+Copy-Item -Path $source -Destination $target -Recurse -Force
+```
+
+更新已有安装时，在仓库目录执行 `git pull` 后重新复制一次即可。复制后重新打开 Codex / Claude Code 会话，或刷新 skills 列表。Codex 中通常用 `$skill-name`，Claude Code 中通常用 `/skill-name`，例如：
 
 ```text
 $rst-review 当前修改未提交的文件
+/rst-review 当前修改未提交的文件
 $qt-review 帮我审查这个 Qt widget 的信号槽和生命周期
+/qt-review 帮我审查这个 Qt widget 的信号槽和生命周期
 $geometry-transform-review 看一下这段配准矩阵链路是否方向写反
+/geometry-transform-review 看一下这段配准矩阵链路是否方向写反
 ```
 
 ## 推荐使用方式
@@ -82,6 +98,7 @@ $geometry-transform-review 看一下这段配准矩阵链路是否方向写反
 
 ```text
 $rst-review 当前修改未提交的文件
+/rst-review 当前修改未提交的文件
 ```
 
 `rst-review` 会先读取当前 diff 范围，再根据文件路径和 diff 内容路由到相关专项。例如：
@@ -114,14 +131,17 @@ $cpp-concurrency-review 看这个控制板 worker 线程 stop 逻辑是否安全
 
 - 想对当前 RSTSystem diff 做一次综合审查。
 - 不确定改动涉及哪些风险领域，需要自动路由专项。
-- 希望 Codex 在可用时用只读子代理并行审查 Qt、并发、几何、安全、数据库、渲染、跨平台问题。
+- 希望当前 Agent 运行时在可用时用只读子代理并行审查 Qt、并发、几何、安全、数据库、渲染、跨平台问题。
 
 典型用法：
 
 ```text
 $rst-review 当前修改未提交的文件
+/rst-review 当前修改未提交的文件
 $rst-review 审查 src/Plugins/PluginSurgicalNavigatView 的改动
+/rst-review 审查 src/Plugins/PluginSurgicalNavigatView 的改动
 $rst-review 对 main...HEAD 做综合审查
+/rst-review 对 main...HEAD 做综合审查
 ```
 
 输出重点：
@@ -134,7 +154,8 @@ $rst-review 对 main...HEAD 做综合审查
 
 重要限制：
 
-- 该 skill 针对 Codex 有效，依赖 Codex 工具、skill 路由和子代理能力。
+- 该 skill 同时面向 Claude Code 与 Codex；子代理接口按运行时自适应，缺少子代理能力时会降级为主会话顺序审查。
+- Claude Code 分支使用 Agent 工具和 `subagent_type: general-purpose`；Codex 分支使用 `multi_agent_v1.spawn_agent` 和 `agent_type: "explorer"`。
 - 它是审查入口，不直接替代各专项 skill。
 - 审查阶段只读，不应自动修改代码或运行 CMake 构建。
 
@@ -313,7 +334,7 @@ $cross-platform-guard 看这个协议包解析在 Windows/Linux 是否一致
 ## 聚合审查建议流程
 
 1. 先用 `git status -sb`、`git diff --stat` 确定范围。
-2. 使用 `$rst-review 当前修改未提交的文件` 做聚合审查。
+2. 使用 `$rst-review 当前修改未提交的文件` 或 `/rst-review 当前修改未提交的文件` 做聚合审查。
 3. 对高风险结论，再直接调用对应专项复核。
 4. 用户确认修复项后再改代码。
 5. 修复后做轻量验证：`git diff --check`、目标 `rg`、源码检查。
@@ -341,4 +362,4 @@ $cross-platform-guard 看这个协议包解析在 Windows/Linux 是否一致
 - 当 RSTSystem 新增模块、数据库表、坐标系或设备协议时，同步更新对应专项 skill。
 - 对真实线上 bug 进行复盘后，把“形状”和“修法”补进 skill 的本项目易错点。
 - `rst-review` 的路由表要保持轻量，只负责分发；专项细则放在各自 skill 内。
-- 对 Codex 以外的 agent 使用时，优先复制专项清单内容，不要直接依赖 `rst-review` 的子代理流程。
+- 对 Claude Code / Codex 以外的兼容 Agent 使用时，可以复用专项清单和聚合流程；如果该运行时没有等价子代理接口，则按主会话顺序审查执行。
