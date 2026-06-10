@@ -61,8 +61,8 @@ skills/
 在 Windows 环境中，先克隆仓库：
 
 ```powershell
-git clone https://github.com/lijie777/rstsystem-codex-skills.git
-cd .\rstsystem-codex-skills
+git clone https://github.com/lijie777/orthopedic-robotics-agent-skills.git
+cd .\orthopedic-robotics-agent-skills
 ```
 
 安装到 Codex：
